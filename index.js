@@ -101,17 +101,23 @@ client.once('ready', async () => {
   // === Înregistrare automată Slash Commands ===
   try {
     const commands = [];
-    const commandsPath = './commands';
-    if (fs.existsSync(commandsPath)) {
-      const files = fs.readdirSync(commandsPath).filter(f => f.endsWith('.js'));
-      for (const file of files) {
-        const cmd = require(`${commandsPath}/${file}`);
-        if ('data' in cmd && 'execute' in cmd) commands.push(cmd.data.toJSON());
+    const basePath = './commands';
+    if (fs.existsSync(basePath)) {
+      const folders = fs.readdirSync(basePath);
+      for (const folder of folders) {
+        const folderPath = `${basePath}/${folder}`;
+        const files = fs.readdirSync(folderPath).filter(f => f.endsWith('.js'));
+        for (const file of files) {
+          const cmd = require(`${folderPath}/${file}`);
+          if ('data' in cmd && 'execute' in cmd) {
+            commands.push(cmd.data.toJSON());
+          }
+        }
       }
     }
 
     const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
-    console.log(`🔁 Înregistrare ${commands.length} slash commands...`);
+    console.log(`🔁 Înregistrare ${commands.length} comenzi slash...`);
     await rest.put(
       Routes.applicationCommands(process.env.CLIENT_ID),
       { body: commands }
@@ -121,48 +127,6 @@ client.once('ready', async () => {
     console.error('❌ Eroare la înregistrarea slash commands:', err);
   }
 });
-
-
-const { REST, Routes } = require('discord.js');
-require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
-
-const commands = [];
-const foldersPath = path.join(__dirname, 'commands');
-const commandFolders = fs.readdirSync(foldersPath);
-
-for (const folder of commandFolders) {
-  const commandsPath = path.join(foldersPath, folder);
-  const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-  for (const file of commandFiles) {
-    const filePath = path.join(commandsPath, file);
-    const command = require(filePath);
-    if ('data' in command && 'execute' in command) {
-      commands.push(command.data.toJSON());
-    } else {
-      console.log(`[AVERTISMENT] Comanda din ${filePath} nu are "data" sau "execute".`);
-    }
-  }
-}
-
-const rest = new REST().setToken(process.env.TOKEN);
-
-(async () => {
-  try {
-    console.log(`🔁 Înregistrare ${commands.length} comenzi slash...`);
-
-    await rest.put(
-      Routes.applicationCommands(process.env.CLIENT_ID),
-      { body: commands },
-    );
-
-    console.log('✅ Comenzile slash au fost înregistrate global!');
-  } catch (error) {
-    console.error(error);
-  }
-})();
-
 
 // --- Gestionare comenzi ---
 client.on('interactionCreate', async interaction => {
@@ -189,8 +153,7 @@ client.on('interactionCreate', async interaction => {
     }
   }
 
-  // 🔨 Comenzi de moderare — (ban, kick, warn, purge, mute, unmute, level)
-  // Tot codul tău pentru acestea rămâne identic — nu trebuie schimbat
+  // 🔨 Comenzi de moderare etc. — restul codului tău rămâne identic
 });
 
 // --- Login Bot ---
