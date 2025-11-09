@@ -1,66 +1,76 @@
-const { Client, Message, MessageEmbed } = require('discord.js');
-var ee = require('../../config/embed.json');
-var config = require('../../config/config.json');
-const antilink = require('../../utils/models/antilink');
+const { Client, Message, EmbedBuilder } = require('discord.js');
+const ee = require('../../config/embed.json');
+const config = require('../../config/config.json');
 
+// Stocăm local starea (nu în DB)
+const activeAntilink = new Set();
 
 module.exports = {
     name: 'antilink',
-    aliases: ['pl'],
+    aliases: ['al'],
     category: '⚙️ Config',
-    memberpermissions: ['ADMINISTRATOR'],
+    memberpermissions: ['Administrator'],
     cooldown: 5,
-    description: "Start lockdown in a channel",
-    usage: "lock",
-    /** 
+    description: 'Activează sau dezactivează sistemul Anti-Link',
+    usage: 'antilink <on|off>',
+    
+    /**
      * @param {Client} client 
      * @param {Message} message 
      * @param {String[]} args 
      */
     run: async (client, message, args, prefix) => {
         if (!args[0]) {
-            return message.channel.send(
-                `Usage: \`${prefix}antilink <on|off>\``
-            );
-        }
-        if (args[0] === "On" || args[0] === "on") {
-            const data = await antilink.findOne({
-                GuildID: message.guild.id,
+            return message.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor(ee.color)
+                        .setDescription(`❓ Folosește: \`${prefix}antilink <on|off>\``)
+                        .setFooter({ text: ee.footertext })
+                ]
             });
-
-            if (data) {
-                await antilink.findOneAndRemove({
-                    GuildID: message.guild.id,
-                });
-
-                message.channel.send(`Antilink is now active!`);
-
-                let newData = new antilink({
-                    GuildID: message.guild.id,
-                });
-                newData.save();
-            } else if (!data) {
-                message.channel.send(`Antilink is now active`);
-
-                let newData = new antilink({
-                    GuildID: message.guild.id,
-                });
-                newData.save();
-            }
-        } else if (args[0] === "off" || args[0] === "Off") {
-            const data2 = await antilink.findOne({
-                GuildID: message.guild.id,
-            });
-
-            if (data2) {
-                await antilink.findOneAndRemove({
-                    GuildID: message.guild.id,
-                });
-
-                return message.channel.send(`Antilink has been turned off!`);
-            } else if (!data2) {
-                return message.channel.send(`Antilink isn't setup!`);
-            }
         }
+
+        const guildID = message.guild.id;
+
+        if (args[0].toLowerCase() === 'on') {
+            activeAntilink.add(guildID);
+            return message.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor('Green')
+                        .setDescription('✅ Sistemul **Anti-Link** a fost activat!')
+                        .setFooter({ text: ee.footertext })
+                ]
+            });
+        }
+
+        if (args[0].toLowerCase() === 'off') {
+            activeAntilink.delete(guildID);
+            return message.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor('Red')
+                        .setDescription('🚫 Sistemul **Anti-Link** a fost dezactivat!')
+                        .setFooter({ text: ee.footertext })
+                ]
+            });
+        }
+
+        return message.reply('❌ Opțiune invalidă. Folosește `on` sau `off`.');
     }
-}
+};
+
+// Eveniment pentru detectarea link-urilor
+module.exports.onMessage = (message) => {
+    if (!message.guild || message.author.bot) return;
+    const guildID = message.guild.id;
+    if (!activeAntilink.has(guildID)) return;
+
+    const linkRegex = /(https?:\/\/[^\s]+)/gi;
+    if (linkRegex.test(message.content)) {
+        message.delete().catch(() => {});
+        message.channel.send(`🚫 ${message.author}, linkurile nu sunt permise aici!`)
+            .then(msg => setTimeout(() => msg.delete().catch(() => {}), 5000));
+    }
+};
